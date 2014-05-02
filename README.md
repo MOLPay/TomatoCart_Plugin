@@ -1,7 +1,7 @@
 MOLPay TomatoCart Plugin
 =====================
 
-MOLPay Plugin for TomatoCart Shopping Cart develop by MOLPay technical team.
+MOLPay Plugin for TomatoCart Shopping Cart developed by MOLPay R&D team.
 
 
 Supported version
