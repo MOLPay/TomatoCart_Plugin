@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<language>
+    <definitions>
+        <definition>
+            <key>payment_molpay_title</key>
+            <value><![CDATA[MOLPay Website Payments]]></value>
+            <group>modules-payment</group>
+        </definition>
+        <definition>
+            <key>payment_molpay_method_title</key>
+            <value><![CDATA[MOLPay Website Payments]]></value>
+            <group>modules-payment</group>
+        </definition>
+    </definitions>
+</language>

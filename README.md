@@ -6,7 +6,9 @@ MOLPay Plugin for TomatoCart Shopping Cart developed by MOLPay R&D team.
 
 Supported version
 -----------------
-TomatoCart 
+
+TomatoCart version 1.1.x
+
 
 Notes
 -----
@@ -20,6 +22,27 @@ Installations
 -------------
 
 1. Download or clone this repository.
+
+2. Extract the file and upload the admin and includes folders to your Tomato Cart directory on your server.
+
+3. Login to the admin section of your TomatoCart installation.
+
+4. Navigate to `Start` -> `Modules` -> `Payment Modules`
+
+5. Scroll down to the `MOLPay` payment method and click the `Install` button to install the module.
+
+6. Once the module is installed, click on `Edit` button. 
+
+7. The MOLPay options will then be shown:
+ 
+    - Edit the payment status as required.
+    - Edit the zones if required.
+    - Insert the `MOLPay Merchant ID` and `MOLPay Verify Key`.
+    - Set Order Status.
+
+8. Click `Save`.You're Done. 
+
+  
 
 
 Contribution
