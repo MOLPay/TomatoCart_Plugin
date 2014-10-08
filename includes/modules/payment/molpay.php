@@ -17,9 +17,9 @@ class osC_Payment_molpay extends osC_Payment {
         $this->_status = ((MODULE_PAYMENT_MOLPAY_STATUS == '1') ? true : false);
 
         if (MODULE_PAYMENT_MOLPAY_DIRECT == 1) {
-            $this->form_action_url = 'https://www.onlinepayment.com.my/MOLPay/pay/'.MODULE_PAYMENT_MOLPAY_SELLER_ID.'/';
+            $this->form_action_url = 'https://www.onlinepayment.com.my/MOLPay/pay/'.MODULE_PAYMENT_MOLPAY_MERCHANT_ID.'/';
         } else {
-            $this->form_action_url = 'https://www.onlinepayment.com.my/MOLPay/pay/'.MODULE_PAYMENT_MOLPAY_SELLER_ID.'/';
+            $this->form_action_url = 'https://www.onlinepayment.com.my/MOLPay/pay/'.MODULE_PAYMENT_MOLPAY_MERCHANT_ID.'/';
         }
 
         if ($this->_status === true) {
@@ -72,10 +72,14 @@ class osC_Payment_molpay extends osC_Payment {
         global $osC_Customer, $osC_Currencies, $osC_ShoppingCart, $osC_Tax, $osC_Language;
 
         $process_button_string = '';
+        //vcode = md5( amount & merchantID & orderID & verify_key)
+        $vcode = md5($osC_Currencies->formatRaw($osC_ShoppingCart->getTotal()).MODULE_PAYMENT_MOLPAY_MERCHANT_ID.$this->_order_id.MODULE_PAYMENT_MOLPAY_MERCHANT_KEY);
         $params = array(
             'merchant_id' => MODULE_PAYMENT_MOLPAY_MERCHANT_ID,
-            'merchant_key' => MODULE_PAYMENT_MOLPAY_MERCHANT_KEY,                                            
-            'returnurl' =>  HTTPS_SERVER . DIR_WS_HTTPS_CATALOG . FILENAME_CHECKOUT . '?callback&module=' . $this->_code
+            'vcode' => $vcode,                                            
+            //'returnurl' =>  HTTPS_SERVER . DIR_WS_HTTPS_CATALOG . FILENAME_CHECKOUT . '?callback&module=' . $this->_code
+            //'returnurl' =>  HTTPS_SERVER . DIR_WS_HTTPS_CATALOG . FILENAME_CHECKOUT . '?process_return&module=' . $this->_code
+            'returnurl' =>  HTTPS_SERVER . DIR_WS_HTTPS_CATALOG . FILENAME_CHECKOUT . '?process'
         );
 
         if ($osC_ShoppingCart->hasShippingAddress()) {
@@ -111,38 +115,11 @@ class osC_Payment_molpay extends osC_Payment {
         return $process_button_string;
     }
 
-    function process() {
-        global $osC_ShoppingCart, $osC_Database;
+    function process() 
+    {
 
-        $prep = explode('-', $_SESSION['prepOrderID']);
-        if ($prep[0] == $osC_ShoppingCart->getCartID()) {
-            $Qcheck = $osC_Database->query('select orders_status_id from :table_orders_status_history where orders_id = :orders_id');
-            $Qcheck->bindTable(':table_orders_status_history', TABLE_ORDERS_STATUS_HISTORY);
-            $Qcheck->bindInt(':orders_id', $prep[1]);
-            $Qcheck->execute();
-
-            $paid = false;
-            if ($Qcheck->numberOfRows() > 0) {
-                while($Qcheck->next()) {
-                    if ($Qcheck->valueInt('orders_status_id') == $this->order_status) {
-                        $paid = true;
-                    }
-                }
-            }
-
-            if ($paid === false) {
-                if (osc_not_null(MODULE_PAYMENT_MOLPAY_PROCESSING_ORDER_STATUS_ID)) {
-                    osC_Order::process($_GET['invoice'], MODULE_PAYMENT_MOLPAY_PROCESSING_ORDER_STATUS_ID, 'MolPay Processing Transaction');
-                }
-            }
-        }
-
-        unset($_SESSION['prepOrderID']);
-    }
-
-    function callback() {
         global $osC_Database, $osC_Currencies, $osC_ShoppingCart, $messageStack, $osC_Language;
-            $vkey ="1a2d20c7150f42e37cfe1b87879fe5cb";
+            $vkey = MODULE_PAYMENT_MOLPAY_MERCHANT_KEY;
 
             $tranID = $_POST['tranID'];
             $orderid = $_POST['orderid'];
@@ -157,41 +134,152 @@ class osC_Payment_molpay extends osC_Payment {
             $key0 = md5( $tranID.$orderid.$status.$domain.$amount.$currency );
             $key1 = md5( $paydate.$domain.$key0.$appcode.$vkey );
 
-            if( $skey == $key1 )
-                $status == 0;
+            //if( $skey != $key1 )
+            //   $status == 0;
 
             if( $status == '00' ){
                 //if success
-                if (isset($orderid) && ($orderid > 0)) {
-                    $Qcheck = $osC_Database->query('select orders_status, currency, currency_value from :table_orders where orders_id = :orders_id');
-                    $Qcheck->bindTable(':table_orders', TABLE_ORDERS);
-                    $Qcheck->bindInt(':orders_id', $orderid);
-                    $Qcheck->execute();
+                if( $skey == $key1 )
+                {
+                    if (isset($orderid) && ($orderid > 0)) {
+                            $Qcheck = $osC_Database->query('select orders_status, currency, currency_value from :table_orders where orders_id = :orders_id');
+                            $Qcheck->bindTable(':table_orders', TABLE_ORDERS);
+                            $Qcheck->bindInt(':orders_id', $orderid);
+                            $Qcheck->execute();
 
-                    if ($Qcheck->numberOfRows() > 0) {
-                        $Qtotal = $osC_Database->query('select value from :table_orders_total where orders_id = :orders_id and class = "total" limit 1');
-                        $Qtotal->bindTable(':table_orders_total', TABLE_ORDERS_TOTAL);
-                        $Qtotal->bindInt(':orders_id', $_REQUEST['orderid']);
-                        $Qtotal->execute();
+                            if ($Qcheck->numberOfRows() > 0) {
+                                $Qtotal = $osC_Database->query('select value from :table_orders_total where orders_id = :orders_id and class = "total" limit 1');
+                                $Qtotal->bindTable(':table_orders_total', TABLE_ORDERS_TOTAL);
+                                $Qtotal->bindInt(':orders_id', $_REQUEST['orderid']);
+                                $Qtotal->execute();
 
-                        $comments = 'MOLPay Order Successful [' . $_REQUEST['cart_id'] . '; ' . $osC_Currencies->format($_REQUEST['total']) . ')]';
-                        $osC_ShoppingCart->reset(true);
-                        osC_Order::process($_REQUEST['orderid'], $this->order_status, $comments);
-                        osc_redirect(osc_href_link(FILENAME_CHECKOUT, 'success', 'SSL', null, null, true));
-                    }
+                                //$comments = 'MOLPay Order Successful [' . $_REQUEST['cart_id'] . '; ' . $osC_Currencies->format($_REQUEST['total']) . ')]';
+                                $comments = 'MOLPay Order Successful [' . $_REQUEST['orderid'] . '; ' . $osC_Currencies->format($_REQUEST['amount']) . ')]';
+                                $osC_ShoppingCart->reset(true);
+                                osC_Order::process($_REQUEST['orderid'], $this->order_status, $comments);
+                                osc_redirect(osc_href_link(FILENAME_CHECKOUT, 'success', 'SSL', null, null, true));
+                                exit;
+                            }
+                        }
+                }
+                else{
+                        //$comments = "FAILED STATUS:, PLEASE CONTACT THE SELLER. key1:".$key1." skey:".$skey." vkey:".$vkey ;
+                        $comments = "FAILED STATUS:, PLEASE CONTACT THE SELLER." ;
+                        $messageStack->add_session('checkout', $comments);
+
+                        osc_redirect(osc_href_link(FILENAME_CHECKOUT, 'checkout&view=paymentInformationForm', 'SSL'));
+
                 }
             }
             else{
-                //if failed
-                $comments = "FAILED STATUS:, PLEASE CONTACT THE SELLER";
+                //cash channel
+                if($status == '22')
+                {
+                                $comments = 'MOLPay Order Successful [' . $_REQUEST['orderid'] . '; ' . $osC_Currencies->format($_REQUEST['amount']) . ')]. Awaiting your physical payment';
+                                $osC_ShoppingCart->reset(true);
+                                $this->order_status = "Pending";
+                                osC_Order::process($_REQUEST['orderid'], $this->order_status, $comments);
+                                osc_redirect(osc_href_link(FILENAME_CHECKOUT, 'success', 'SSL', null, null, true));
+                }
+                else
+                {       //if failed
+                        $comments = "FAILED STATUS, PLEASE CONTACT THE SELLER";
 
-                $messageStack->add_session('checkout', $comments);
+                        $messageStack->add_session('checkout', $comments);
+                        osC_Order::insertOrderStatusHistory($_REQUEST['cart_order_id'], $this->order_status, $comments);
+                        osc_redirect(osc_href_link(FILENAME_CHECKOUT, 'checkout&view=paymentInformationForm', 'SSL'));
+                }
 
-                osC_Order::insertOrderStatusHistory($_REQUEST['orderid'], $this->order_status, $comments);
 
-                osc_redirect(osc_href_link(FILENAME_CHECKOUT, 'checkout&view=paymentInformationForm', 'SSL'));
             }
 
     }
+
+
+    function callback() 
+    {
+
+        global $osC_Database, $osC_Currencies, $osC_ShoppingCart, $messageStack, $osC_Language;
+            $vkey = MODULE_PAYMENT_MOLPAY_MERCHANT_KEY;
+
+            $nbcb   = $_POST['nbcb'];
+            $tranID = $_POST['tranID'];
+            $orderid = $_POST['orderid'];
+            $status = $_POST['status'];
+            $domain = $_POST['domain'];
+            $amount = $_POST['amount'];
+            $currency = $_POST['currency'];
+            $appcode = $_POST['appcode'];
+            $paydate = $_POST['paydate'];
+            $skey = $_POST['skey'];
+
+            $key0 = md5( $tranID.$orderid.$status.$domain.$amount.$currency );
+            $key1 = md5( $paydate.$domain.$key0.$appcode.$vkey );
+
+            //if( $skey != $key1 )
+            //   $status == 0;
+
+            if( $status == '00' ){
+                //if success
+                if( $skey == $key1 )
+                {
+                    if (isset($orderid) && ($orderid > 0)) {
+                            $Qcheck = $osC_Database->query('select orders_status, currency, currency_value from :table_orders where orders_id = :orders_id');
+                            $Qcheck->bindTable(':table_orders', TABLE_ORDERS);
+                            $Qcheck->bindInt(':orders_id', $orderid);
+                            $Qcheck->execute();
+
+                            if ($Qcheck->numberOfRows() > 0) {
+                                $Qtotal = $osC_Database->query('select value from :table_orders_total where orders_id = :orders_id and class = "total" limit 1');
+                                $Qtotal->bindTable(':table_orders_total', TABLE_ORDERS_TOTAL);
+                                $Qtotal->bindInt(':orders_id', $_REQUEST['orderid']);
+                                $Qtotal->execute();
+
+                                //$comments = 'MOLPay Order Successful [' . $_REQUEST['cart_id'] . '; ' . $osC_Currencies->format($_REQUEST['total']) . ')]';
+                                $comments = 'MOLPay Order Successful [' . $_REQUEST['orderid'] . '; ' . $osC_Currencies->format($_REQUEST['amount']) . ')]';
+                                $osC_ShoppingCart->reset(true);
+                                osC_Order::process($_REQUEST['orderid'], $this->order_status, $comments);
+                                osc_redirect(osc_href_link(FILENAME_CHECKOUT, 'success', 'SSL', null, null, true));
+                            }
+                        }
+                }
+                else{
+                        //$comments = "FAILED STATUS:, PLEASE CONTACT THE SELLER. key1:".$key1." skey:".$skey." vkey:".$vkey ;
+                        $comments = "FAILED STATUS:, PLEASE CONTACT THE SELLER." ;
+                        $messageStack->add_session('checkout', $comments);
+
+                        osc_redirect(osc_href_link(FILENAME_CHECKOUT, 'checkout&view=paymentInformationForm', 'SSL'));
+
+                }
+            }
+            else{
+                //cash channel
+                if($status == '22')
+                {
+                                $comments = 'MOLPay Order Successful [' . $_REQUEST['orderid'] . '; ' . $osC_Currencies->format($_REQUEST['amount']) . ')]. Awaiting your physical payment';
+                                $osC_ShoppingCart->reset(true);
+                                $this->order_status = "Pending";
+                                osC_Order::process($_REQUEST['orderid'], $this->order_status, $comments);
+                                osc_redirect(osc_href_link(FILENAME_CHECKOUT, 'success', 'SSL', null, null, true));
+                }
+                else
+                {       //if failed
+                        $comments = "FAILED STATUS, PLEASE CONTACT THE SELLER";
+
+                        $messageStack->add_session('checkout', $comments);
+                        osC_Order::insertOrderStatusHistory($_REQUEST['cart_order_id'], $this->order_status, $comments);
+                        osc_redirect(osc_href_link(FILENAME_CHECKOUT, 'checkout&view=paymentInformationForm', 'SSL'));
+                }
+
+
+            }
+
+            if ( $nbcb==1 ) {
+                  //callback IPN feedback to notified MOLPay
+                  echo "CBTOKEN:MPSTATOK";
+            }
+
+    }
+
 }
 ?>
