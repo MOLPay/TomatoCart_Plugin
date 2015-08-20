@@ -137,6 +137,27 @@ class osC_Payment_molpay extends osC_Payment {
             //if( $skey != $key1 )
             //   $status == 0;
 
+            //===========================IPN===============================================//
+            $_POST['treq']=1;
+
+            while ( list($k,$v) = each($_POST) ) 
+            {
+                $postData[]= $k."=".$v;
+            }
+            $postdata   =implode("&",$postData);
+            $url        ="https://www.onlinepayment.com.my/MOLPay/API/chkstat/returnipn.php";
+            $ch         =curl_init();
+            curl_setopt($ch, CURLOPT_POST , 1 );
+            curl_setopt($ch, CURLOPT_POSTFIELDS , $postdata );
+            curl_setopt($ch, CURLOPT_URL , $url );
+            curl_setopt($ch, CURLOPT_HEADER , 1 );
+            curl_setopt($ch, CURLINFO_HEADER_OUT , TRUE );
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER , 1 );
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER , FALSE);
+            $result = curl_exec( $ch );
+            curl_close( $ch );
+            //=======================END OF IPN=============================================//
+            
             if( $status == '00' ){
                 //if success
                 if( $skey == $key1 )
@@ -219,6 +240,13 @@ class osC_Payment_molpay extends osC_Payment {
             //if( $skey != $key1 )
             //   $status == 0;
 
+            //=====================CALLBACK IPN===================//
+            if ( $nbcb==1 ) {
+                  //callback IPN feedback to notified MOLPay
+                  echo "CBTOKEN:MPSTATOK";
+            }
+            //=============END OF CALLBACK IPN===================//
+            
             if( $status == '00' ){
                 //if success
                 if( $skey == $key1 )
