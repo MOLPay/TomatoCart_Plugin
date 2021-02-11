@@ -50,7 +50,12 @@ Installations
     - Insert the `MOLPay Merchant ID` and `MOLPay Verify Key`.
     - Set Order Status.
 
-8. Click `Save`.You're Done. 
+8. Click `Save`.
+9. On the MERCHANT PROFILE menu. Fill in Callback URL with this URL:
+
+   ``http://YOURSITE/checkout.php?callback&module=molpay``
+   
+   *Replace YOURSITE with you shopping cart domain.
 
   
 
